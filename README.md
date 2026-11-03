@@ -16,7 +16,7 @@ This tool provides a bridge between **NetBox API** and the **GRENML** (Global Re
 
 ## Prerequisites
 
-- Python 3.x
+- Python 3.x (3.12 recommended, as grenml lib works in this version)
 - `requests` library
 - `geopy` library
 - `grenml` library
