@@ -78,8 +78,10 @@ def main() -> None:
         export_netbox.target_url = args.target_url
     if args.target_token:
         export_netbox.target_token = args.target_token
-    export_netbox.no_purge = args.no_purge
-    export_netbox.dry_run = args.dry_run
+    if args.no_purge is not None:
+        export_netbox.no_purge = args.no_purge
+    if args.dry_run is not None:
+        export_netbox.dry_run = args.dry_run
 
     common = CommonConfig()
 
@@ -117,7 +119,7 @@ def main() -> None:
 
     for fmt in formats_to_run:
         if fmt == "grenml":
-            exporter = GRENMLExporter()
+            exporter = GRENMLExporter(config)
             output_path = args.output or DEFAULT_OUTPUT_FILES.get("grenml", "output.xml")
             exporter.export(topology, output_path=output_path)
         elif fmt == "netbox":

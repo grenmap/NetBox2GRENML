@@ -5,7 +5,7 @@ import json
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from config import Config
+from config import Config, device_matches_filters
 from anonymization.anonymizer import Anonymizer
 from geocoding.geocoder import Geocoder
 
@@ -229,8 +229,7 @@ class TopologyBuilder:
         all_devices = devices_data.get("results", [])
         active_nodes = [
             d for d in all_devices
-            if (d.get("role") or {}).get("slug") == self.config.common.device_role_slug
-            and (d.get("status") or {}).get("value") == "active"
+            if device_matches_filters(d, self.config.source.device_filters)
         ]
 
         if self.config.common.aggregate_by_owner:
