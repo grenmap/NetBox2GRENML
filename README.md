@@ -20,6 +20,7 @@ This tool provides a bridge between **NetBox API** and the **GRENML** (Global Re
 - `requests` library
 - `geopy` library
 - `grenml` library
+- `python-dotenv` library (not required, but useful)
 
 ## Installation
 

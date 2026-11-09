@@ -418,7 +418,10 @@ class NetBoxExporter(BaseExporter):
             return None
 
         idx = self._interface_counter.get(device_id, 0)
-        if_name = f"eth{idx}"
+        if self._config.common.anonymize_interfaces:
+            if_name = f"{self._config.common.anonymize_interface_prefix}{idx}"
+        else:
+            if_name = f"eth{idx}"
         self._interface_counter[device_id] = idx + 1
 
         payload = {
