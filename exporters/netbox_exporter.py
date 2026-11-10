@@ -64,6 +64,7 @@ class NetBoxExporter(BaseExporter):
         self._device_role_id: Optional[int] = None
         self._provider_id: Optional[int] = None
         self._circuit_type_id: Optional[int] = None
+        self._platform_map: Dict[str, int] = {}  # platform_name -> netbox platform id
 
         # IP allocation state
         self._ip_next: int = 0  # offset from base address
@@ -232,6 +233,7 @@ class NetBoxExporter(BaseExporter):
             ("ipam/ip-addresses", "IP Addresses"),
             ("dcim/interfaces", "Interfaces"),
             ("dcim/devices", "Devices"),
+            ("dcim/platforms", "Platforms"),
             ("dcim/sites", "Sites"),
             ("dcim/device-roles", "Device Roles"),
             ("dcim/device-types", "Device Types"),
@@ -340,37 +342,75 @@ class NetBoxExporter(BaseExporter):
         self._stats["tenants_created"] = count
 
     def _create_sites(self, nodes: List[TopologyNode]) -> None:
-        """Create one site per topology node."""
+        """Create sites in target NetBox, deduplicating by site_name."""
         print("\n--- Creating Sites ---")
-        payloads: List[Dict[str, Any]] = []
-        node_order: List[str] = []
+        count = 0
+        seen_names: Dict[str, int] = {}
+        pending: List[Tuple[str, Dict[str, Any]]] = []
+
+        # 1) Build deduplicated payloads
         for node in nodes:
-            slug = _slugify(node.name)
+            site_name = node.site_name or node.name
+            if site_name in seen_names:
+                continue
+            seen_names[site_name] = -1
+            slug = _slugify(site_name)
             payload: Dict[str, Any] = {
-                "name": node.name,
+                "name": site_name,
                 "slug": slug,
                 "status": "active",
             }
-            if node.latitude:
-                payload["latitude"] = round(float(node.latitude), 6)
-            if node.longitude:
-                payload["longitude"] = round(float(node.longitude), 6)
+            if node.latitude and node.longitude:
+                payload["latitude"] = round(node.latitude, 6)
+                payload["longitude"] = round(node.longitude, 6)
             if node.address:
                 payload["physical_address"] = node.address
-            # Assign tenant if node has a non-primary owner
-            for oid in node.owner_ids:
-                if oid in self._tenant_map:
-                    payload["tenant"] = self._tenant_map[oid]
-                    break
-            payloads.append(payload)
-            node_order.append(node.id)
+            pending.append((site_name, payload))
 
-        created = self._post_bulk("dcim/sites", payloads)
-        for idx, obj in enumerate(created):
-            if idx < len(node_order) and obj.get("id"):
-                self._site_map[node_order[idx]] = obj["id"]
-        self._stats["sites_created"] = len(created)
-        print(f"  [SITES] Created {len(created)} sites")
+        # 2) Try bulk first
+        payloads = [p for _, p in pending]
+        names   = [n for n, _ in pending]
+        if payloads:
+            results = self._post_bulk("dcim/sites", payloads)
+            if results:
+                for site_name, result in zip(names, results):
+                    if result and result.get("id"):
+                        seen_names[site_name] = result["id"]
+                        count += 1
+            else:
+                # Fallback one-by-one with get-or-create
+                for site_name, payload in pending:
+                    if seen_names[site_name] > 0:
+                        continue
+                    result = self._post("dcim/sites", payload)
+                    if result and result.get("id"):
+                        seen_names[site_name] = result["id"]
+                        count += 1
+                    else:
+                        # Already exists — fetch by slug
+                        existing = self._get_by_slug("dcim/sites", payload["slug"])
+                        if existing:
+                            seen_names[site_name] = existing["id"]
+
+        # 3) Map EVERY node to its site id
+        for node in nodes:
+            site_name = node.site_name or node.name
+            site_id = seen_names.get(site_name)
+            if site_id and site_id > 0:
+                self._site_map[node.id] = site_id
+
+        print(f"  [SITES] Created {count} sites")
+
+    def _get_by_slug(self, endpoint: str, slug: str) -> Optional[Dict]:
+        """Fetch a single object by slug from target NetBox."""
+        try:
+            url = f"{self.base_url}/{endpoint}/?slug={slug}"
+            r = self.session.get(url)
+            r.raise_for_status()
+            results = r.json().get("results", [])
+            return results[0] if results else None
+        except Exception:
+            return None
 
     def _create_devices(self, nodes: List[TopologyNode]) -> None:
         """Create one device per topology node, placed in its site."""
@@ -390,6 +430,11 @@ class NetBoxExporter(BaseExporter):
                 "site": site_id,
                 "status": "active",
             }
+            # Assign platform from source NetBox
+            if node.platform:
+                plat_id = self._ensure_platform(node.platform)
+                if plat_id:
+                    payload["platform"] = plat_id
             # Assign tenant
             for oid in node.owner_ids:
                 if oid in self._tenant_map:
@@ -404,6 +449,20 @@ class NetBoxExporter(BaseExporter):
                 self._device_map[node_order[idx]] = obj["id"]
         self._stats["devices_created"] = len(created)
         print(f"  [DEVICES] Created {len(created)} devices")
+
+    def _ensure_platform(self, platform_name: str) -> Optional[int]:
+        """Get or create a platform by name. Returns the NetBox platform ID."""
+        if platform_name in self._platform_map:
+            return self._platform_map[platform_name]
+        slug = _slugify(platform_name)
+        plat_id = self._get_or_create(
+            "dcim/platforms", slug,
+            {"name": platform_name, "slug": slug},
+        )
+        if plat_id:
+            self._platform_map[platform_name] = plat_id
+        return plat_id
+
 
     def _ensure_interface(
         self, node_id: str, link_id: str,
@@ -478,10 +537,10 @@ class NetBoxExporter(BaseExporter):
         For /32 (loopback) no alignment is needed.
         """
         base = ipaddress.IPv4Address(self._config.common.anonymize_ip_base)
-        if prefix_len == 31:
-            # Align to even boundary for /31 pairs
-            if self._ip_next % 2 != 0:
-                self._ip_next += 1
+        # if prefix_len == 31:
+        #     # Align to even boundary for /31 pairs
+        #     if self._ip_next % 2 != 0:
+        #         self._ip_next += 1
         addr = base + self._ip_next
         self._ip_next += 1
         return addr

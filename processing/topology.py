@@ -23,6 +23,8 @@ class TopologyNode:
     longitude: float
     address: Optional[str]
     owner_ids: List[str]
+    site_name: Optional[str] = None
+    platform: Optional[str] = None
     properties: Dict[str, str] = field(default_factory=dict)
 
 
@@ -258,13 +260,20 @@ class TopologyBuilder:
                     lat, lon, adr = self.geocoder.get_location_data(
                         rep, sites_map, self.config.common.anonymize_location
                     )
+                    print("address:" + adr)
                     owner_ids = [primary_inst.id]
                     if inst.id != primary_inst.id:
                         owner_ids.append(inst.id)
+                    site_obj = rep.get("site") or {}
+                    site_nm = site_obj.get("name") or site_obj.get("display", "")
+                    plat_obj = rep.get("platform") or {}
+                    plat_nm = plat_obj.get("name") if isinstance(plat_obj, dict) else None
                     node = TopologyNode(
                         id=urn, name=inst.name, short_name=inst.name,
                         latitude=lat, longitude=lon, address=adr,
                         owner_ids=owner_ids,
+                        site_name=site_nm or None,
+                        platform=plat_nm,
                     )
                     self.anonymizer.populate_additional_properties(node, rep)
                     processed[urn] = node
@@ -291,10 +300,18 @@ class TopologyBuilder:
                         t_id =  	(device.get("tenant") or {}).get("id")
                         if t_id and t_id in tenant_map:
                             owner_ids.append(tenant_map[t_id].id)
+                        rep_dev = rep_devices_site[s_id]
+                        site_obj = rep_dev.get("site") or {}
+                        site_nm = site_obj.get("name") or site_obj.get("display", "")
+                        plat_obj = rep_dev.get("platform") or {}
+                        plat_nm = plat_obj.get("name") if isinstance(plat_obj, dict) else None
+                        print("address:" + adr)
                         node = TopologyNode(
                             id=urn, name=name, short_name=name,
                             latitude=lat, longitude=lon, address=adr,
                             owner_ids=owner_ids,
+                            site_name=site_nm or None,
+                            platform=plat_nm,
                         )
                         self.anonymizer.populate_additional_properties(
                             node, rep_devices_site[s_id]
@@ -310,10 +327,17 @@ class TopologyBuilder:
                 t_id =  	(device.get("tenant") or {}).get("id")
                 if t_id and t_id in tenant_map:
                     owner_ids.append(tenant_map[t_id].id)
+                site_obj = device.get("site") or {}
+                site_nm = site_obj.get("name") or site_obj.get("display", "")
+                plat_obj = device.get("platform") or {}
+                plat_nm = plat_obj.get("name") if isinstance(plat_obj, dict) else None
+                print("address:" + adr)
                 node = TopologyNode(
                     id=urn, name=device["name"], short_name=device["name"],
                     latitude=lat, longitude=lon, address=adr,
                     owner_ids=owner_ids,
+                    site_name=site_nm or None,
+                    platform=plat_nm,
                 )
                 self.anonymizer.populate_additional_properties(node, device)
                 processed[urn] = node

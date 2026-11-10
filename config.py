@@ -1,17 +1,4 @@
-﻿
-"""Global configuration flags and constants — Fase 3 (nested structure).
-
-Sensitive values (tokens, URLs) are read from environment variables
-with sensible defaults.  Create a ``.env`` file (loaded automatically
-if python-dotenv is installed) or ``export`` the vars before running::
-
-    NETBOX_SOURCE_URL=https://netbox.ceo.rnp.br/api/
-    NETBOX_SOURCE_TOKEN=nbt_...
-    NETBOX_SOURCE_PAGE_SIZE=1000
-    NETBOX_TARGET_URL=http://usuario.df.testbeds.rnp.br:14008/api/
-    NETBOX_TARGET_TOKEN=nbt_...
-"""
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
@@ -225,7 +212,7 @@ class CommonConfig:
     generic_owner_name: str = field(default_factory=lambda: _env(
         "GENERIC_OWNER_NAME", "generic-owner"))
     device_role_slug: str = field(default_factory=lambda: _env(
-        "DEVICE_ROLE_SLUG", "gp4l-node"))
+        "DEVICE_ROLE_SLUG", "core"))
 
 
 # ------------------------------------------------------------------
