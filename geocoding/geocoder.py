@@ -1,9 +1,11 @@
-﻿from __future__ import annotations
+﻿"""Geocoder with in-memory caching. Reverse uses BigDataCloud; forward uses Nominatim."""
+from __future__ import annotations
 
 import time
 from typing import Any, Dict, Optional, Tuple
 
 import requests
+
 
 class Geocoder:
     """Geocoder with in-memory caching. Reverse uses BigDataCloud; forward uses Nominatim."""
@@ -69,7 +71,7 @@ class Geocoder:
     # ------------------------------------------------------------------
 
     def reverse_geocode(self, lat: float, lon: float) -> Optional[str]:
-        """Return an anonymized address string (city, state, country) for coordinates."""
+        """Return an address string (city, state, country) for coordinates."""
         cache_key = (lat, lon)
         if cache_key in self._reverse_cache:
             return self._reverse_cache[cache_key]
@@ -105,8 +107,12 @@ class Geocoder:
         sites_map: Dict[int, Dict[str, Any]],
         anonymize: bool = False,
     ) -> Tuple[float, float, Optional[str]]:
-        """Resolve lat/lon/address for a device, with optional anonymization."""
-        location_obj = device.get("location")
+        """Resolve lat/lon/address for a device.
+
+        The address is ALWAYS "city, state, country" (via reverse geocode).
+        When *anonymize* is True the coordinates are also snapped to the
+        city centroid so the exact location is hidden.
+        """
         site_minimal = device.get("site")
         site_full = (
             sites_map.get(site_minimal["id"])
@@ -140,19 +146,15 @@ class Geocoder:
         if lat is None:
             return 0, 0, None
 
-        # 4. Anonymize or build plain address
-        if anonymize:
-            anon_addr = self.reverse_geocode(lat, lon)
-            if anon_addr:
-                anon_lat, anon_lon, _ = self.geocode(anon_addr)
-                if anon_lat is not None:
-                    return anon_lat, anon_lon, anon_addr
-                return lat, lon, anon_addr
-            return lat, lon, None
-        else:
-            parts = [
-                location_obj.get("name") if location_obj else None,
-                site_minimal.get("name") if site_minimal else None,
-            ]
-            final_addr = ", ".join(filter(None, parts))
-            return lat, lon, (final_addr if final_addr else None)
+        # 4. Always reverse-geocode to get "city, state, country"
+        addr = self.reverse_geocode(lat, lon)
+
+        if anonymize and addr:
+            # Snap coordinates to city centroid to hide exact location
+            anon_lat, anon_lon, _ = self.geocode(addr)
+            if anon_lat is not None:
+                return anon_lat, anon_lon, addr
+            # Reverse succeeded but forward failed — keep original coords
+            return lat, lon, addr
+
+        return lat, lon, addr

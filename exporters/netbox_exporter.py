@@ -265,7 +265,10 @@ class NetBoxExporter(BaseExporter):
                         f"retrying {len(remaining)} individually...")
                     for obj_id in remaining:
                         try:
-                            r = self._request("DELETE", f"{endpoint}/{obj_id}/")
+                            r = requests.delete(
+                                self._url(endpoint) + f"{obj_id}/",
+                                headers=self._headers, verify=False,
+                            )
                             if r.status_code in (204, 404):
                                 count += 1
                             else:
@@ -288,27 +291,34 @@ class NetBoxExporter(BaseExporter):
     # ==================================================================
 
     def _scaffold(self) -> None:
-        """Ensure generic manufacturer, device-type, role, provider, circuit-type."""
+        """Ensure manufacturer, device-type, role, provider, circuit-type.
+
+        All slugs/names are read from ``self._config.export_netbox``
+        (env-driven via ``NETBOX_MANUFACTURER_*``, ``NETBOX_DEVICE_TYPE_*``,
+        ``NETBOX_DEVICE_ROLE_*``).
+        """
+        ec = self._config.export_netbox          # shortcut
+
         print("\n" + "=" * 60)
-        print("SCAFFOLD -- Ensuring generic infrastructure objects")
+        print("SCAFFOLD -- Ensuring infrastructure objects")
         print("=" * 60)
 
         self._manufacturer_id = self._get_or_create(
-            "dcim/manufacturers", "generic",
-            {"name": "Generic", "slug": "generic"},
+            "dcim/manufacturers", ec.manufacturer_slug,
+            {"name": ec.manufacturer_name, "slug": ec.manufacturer_slug},
         )
         self._device_type_id = self._get_or_create(
-            "dcim/device-types", "generic-router",
+            "dcim/device-types", ec.device_type_slug,
             {
-                "name": "Generic Router",
-                "slug": "generic-router",
+                "name": ec.device_type_name,
+                "slug": ec.device_type_slug,
                 "manufacturer": self._manufacturer_id,
-                "model": "Generic Router",
+                "model": ec.device_type_model,
             },
         )
         self._device_role_id = self._get_or_create(
-            "dcim/device-roles", "gp4l-node",
-            {"name": "gp4l-node", "slug": "gp4l-node"},
+            "dcim/device-roles", ec.device_role_slug,
+            {"name": ec.device_role_name, "slug": ec.device_role_slug},
         )
         self._provider_id = self._get_or_create(
             "circuits/providers", "generic-provider",
@@ -348,7 +358,7 @@ class NetBoxExporter(BaseExporter):
         seen_names: Dict[str, int] = {}
         pending: List[Tuple[str, Dict[str, Any]]] = []
 
-        # 1) Build deduplicated payloads
+        # 1) Build deduplicated payloads keyed by site_name
         for node in nodes:
             site_name = node.site_name or node.name
             if site_name in seen_names:
@@ -361,15 +371,20 @@ class NetBoxExporter(BaseExporter):
                 "status": "active",
             }
             if node.latitude and node.longitude:
-                payload["latitude"] = round(node.latitude, 6)
-                payload["longitude"] = round(node.longitude, 6)
+                payload["latitude"] = round(float(node.latitude), 6)
+                payload["longitude"] = round(float(node.longitude), 6)
             if node.address:
                 payload["physical_address"] = node.address
+            # Assign tenant if node has a non-primary owner
+            for oid in node.owner_ids:
+                if oid in self._tenant_map:
+                    payload["tenant"] = self._tenant_map[oid]
+                    break
             pending.append((site_name, payload))
 
         # 2) Try bulk first
         payloads = [p for _, p in pending]
-        names   = [n for n, _ in pending]
+        names = [n for n, _ in pending]
         if payloads:
             results = self._post_bulk("dcim/sites", payloads)
             if results:
@@ -378,7 +393,7 @@ class NetBoxExporter(BaseExporter):
                         seen_names[site_name] = result["id"]
                         count += 1
             else:
-                # Fallback one-by-one with get-or-create
+                # Fallback: one-by-one with get-or-create
                 for site_name, payload in pending:
                     if seen_names[site_name] > 0:
                         continue
@@ -388,7 +403,8 @@ class NetBoxExporter(BaseExporter):
                         count += 1
                     else:
                         # Already exists — fetch by slug
-                        existing = self._get_by_slug("dcim/sites", payload["slug"])
+                        existing = self._get_by_slug(
+                            "dcim/sites", payload["slug"])
                         if existing:
                             seen_names[site_name] = existing["id"]
 
@@ -399,13 +415,14 @@ class NetBoxExporter(BaseExporter):
             if site_id and site_id > 0:
                 self._site_map[node.id] = site_id
 
+        self._stats["sites_created"] = count
         print(f"  [SITES] Created {count} sites")
 
     def _get_by_slug(self, endpoint: str, slug: str) -> Optional[Dict]:
         """Fetch a single object by slug from target NetBox."""
         try:
-            url = f"{self.base_url}/{endpoint}/?slug={slug}"
-            r = self.session.get(url)
+            url = self._url(endpoint) + f"?slug={slug}"
+            r = requests.get(url, headers=self._headers, verify=False)
             r.raise_for_status()
             results = r.json().get("results", [])
             return results[0] if results else None
@@ -422,7 +439,7 @@ class NetBoxExporter(BaseExporter):
             if not site_id:
                 print(f"  [SKIP] No site for node '{node.name}', skipping device")
                 continue
-            device_name = f"{node.name}-router"
+            device_name = f"{node.name}"
             payload: Dict[str, Any] = {
                 "name": device_name,
                 "device_type": self._device_type_id,
@@ -462,7 +479,6 @@ class NetBoxExporter(BaseExporter):
         if plat_id:
             self._platform_map[platform_name] = plat_id
         return plat_id
-
 
     def _ensure_interface(
         self, node_id: str, link_id: str,
@@ -537,10 +553,7 @@ class NetBoxExporter(BaseExporter):
         For /32 (loopback) no alignment is needed.
         """
         base = ipaddress.IPv4Address(self._config.common.anonymize_ip_base)
-        # if prefix_len == 31:
-        #     # Align to even boundary for /31 pairs
-        #     if self._ip_next % 2 != 0:
-        #         self._ip_next += 1
+            
         addr = base + self._ip_next
         self._ip_next += 1
         return addr

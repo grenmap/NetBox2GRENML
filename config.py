@@ -138,7 +138,7 @@ def _env_filters() -> List[FilterGroup]:
 class ImportConfig:
     """NetBox SOURCE connection settings."""
     base_url: str = field(default_factory=lambda: _env(
-        "NETBOX_SOURCE_URL", "https://netbox.gp4l.nmaas.eu/api/"))
+        "NETBOX_SOURCE_URL", "your-netbox.example.com"))
     token: str = field(default_factory=lambda: _env(
         "NETBOX_SOURCE_TOKEN", ""))
     page_size: str = field(default_factory=lambda: _env(
@@ -157,6 +157,23 @@ class ExportNetboxConfig:
         "NETBOX_TARGET_NO_PURGE", False))
     dry_run: bool = field(default_factory=lambda: _env_bool(
         "NETBOX_TARGET_DRY_RUN", False))
+
+    # --- Scaffold: manufacturer, device-type, device-role ---
+    manufacturer_name: str = field(default_factory=lambda: _env(
+        "NETBOX_MANUFACTURER_NAME", "Generic"))
+    manufacturer_slug: str = field(default_factory=lambda: _env(
+        "NETBOX_MANUFACTURER_SLUG", "generic"))
+    device_type_name: str = field(default_factory=lambda: _env(
+        "NETBOX_DEVICE_TYPE_NAME", "Generic Router"))
+    device_type_slug: str = field(default_factory=lambda: _env(
+        "NETBOX_DEVICE_TYPE_SLUG", "generic-router"))
+    device_type_model: str = field(default_factory=lambda: _env(
+        "NETBOX_DEVICE_TYPE_MODEL", "Generic Router"))
+    device_role_name: str = field(default_factory=lambda: _env(
+        "NETBOX_DEVICE_ROLE_NAME", "Generic Node"))
+    device_role_slug: str = field(default_factory=lambda: _env(
+        "NETBOX_DEVICE_ROLE_SLUG", "generic-node"))
+
 
 
 @dataclass
@@ -212,7 +229,7 @@ class CommonConfig:
     generic_owner_name: str = field(default_factory=lambda: _env(
         "GENERIC_OWNER_NAME", "generic-owner"))
     device_role_slug: str = field(default_factory=lambda: _env(
-        "DEVICE_ROLE_SLUG", "core"))
+        "DEVICE_ROLE_SLUG", "generic-node"))
 
 
 # ------------------------------------------------------------------

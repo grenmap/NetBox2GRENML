@@ -135,7 +135,7 @@ class TopologyBuilder:
             if not dev_id:
                 continue
             site_id = (device.get("site") or {}).get("id")
-            tenant_id =  	(device.get("tenant") or {}).get("id")
+            tenant_id = (device.get("tenant") or {}).get("id")
             if site_id:
                 device_site_map[dev_id] = site_id
             if tenant_id:
@@ -247,7 +247,7 @@ class TopologyBuilder:
                 if slug:
                     role_slugs.add(slug)
             print(f"DEBUG: Found role slugs in devices: {role_slugs}")
-            print(f"DEBUG: Filtering for device_role_slug = '{self.config.device_role_slug}'")
+            print(f"DEBUG: Filtering for device_role_slug = '{self.config.common.device_role_slug}'")
 
             for device in active_nodes:
                 urn = device_owner_map.get(device["id"], self.config.common.generic_owner_id)
@@ -297,7 +297,7 @@ class TopologyBuilder:
                             self.config.common.anonymize_location,
                         )
                         owner_ids = [primary_inst.id]
-                        t_id =  	(device.get("tenant") or {}).get("id")
+                        t_id = (device.get("tenant") or {}).get("id")
                         if t_id and t_id in tenant_map:
                             owner_ids.append(tenant_map[t_id].id)
                         rep_dev = rep_devices_site[s_id]
@@ -324,7 +324,7 @@ class TopologyBuilder:
                     device, sites_map, self.config.common.anonymize_location
                 )
                 owner_ids = [primary_inst.id]
-                t_id =  	(device.get("tenant") or {}).get("id")
+                t_id = (device.get("tenant") or {}).get("id")
                 if t_id and t_id in tenant_map:
                     owner_ids.append(tenant_map[t_id].id)
                 site_obj = device.get("site") or {}
