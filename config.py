@@ -201,10 +201,22 @@ class CommonConfig:
         "AGGREGATE_BY_SITE", False))
     remove_unlinked_nodes: bool = field(default_factory=lambda: _env_bool(
         "REMOVE_UNLINKED_NODES", False))
+    unify_netbox_tenants: bool = field(default_factory=lambda: _env_bool(
+        "UNIFY_NETBOX_TENANTS", False))
+    unified_tenant_name: str = field(default_factory=lambda: _env(
+        "UNIFIED_TENANT_NAME", "Unified NetBox Tenant"))
 
     # --- Anonymization ---
     anonymize_location: bool = field(default_factory=lambda: _env_bool(
         "ANONYMIZE_LOCATION", False))
+    anonymize_site_names: bool = field(default_factory=lambda: _env_bool(
+        "ANONYMIZE_SITE_NAMES", False))
+    anonymize_site_prefix: str = field(default_factory=lambda: _env(
+        "ANONYMIZE_SITE_PREFIX", "site-"))
+    anonymize_device_names: bool = field(default_factory=lambda: _env_bool(
+        "ANONYMIZE_DEVICE_NAMES", False))
+    anonymize_device_prefix: str = field(default_factory=lambda: _env(
+        "ANONYMIZE_DEVICE_PREFIX", "device-"))
     anonymize_fields: bool = field(default_factory=lambda: _env_bool(
         "ANONYMIZE_FIELDS", False))
     anonymize_interfaces: bool = field(default_factory=lambda: _env_bool(

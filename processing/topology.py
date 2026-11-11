@@ -139,7 +139,12 @@ class TopologyBuilder:
             if site_id:
                 device_site_map[dev_id] = site_id
             if tenant_id:
-                device_owner_map[dev_id] = f"urn:netbox:tenant:{tenant_id}"
+                owner_id = (
+                    "urn:netbox:tenant:unified"
+                    if self.config.common.unify_netbox_tenants
+                    else f"urn:netbox:tenant:{tenant_id}"
+                )
+                device_owner_map[dev_id] = owner_id
                 tenants_raw[tenant_id] = device["tenant"]
             else:
                 device_owner_map[dev_id] = self.config.common.generic_owner_id
@@ -152,12 +157,20 @@ class TopologyBuilder:
         topology.institutions.append(primary)
 
         tenant_map: Dict[int, TopologyInstitution] = {}
-        for t_id, t_data in tenants_raw.items():
+        if self.config.common.unify_netbox_tenants and tenants_raw:
             inst = TopologyInstitution(
-                id=f"urn:netbox:tenant:{t_id}", name=t_data["name"]
+                id="urn:netbox:tenant:unified",
+                name=self.config.common.unified_tenant_name,
             )
             topology.institutions.append(inst)
-            tenant_map[t_id] = inst
+            tenant_map = {t_id: inst for t_id in tenants_raw}
+        else:
+            for t_id, t_data in tenants_raw.items():
+                inst = TopologyInstitution(
+                    id=f"urn:netbox:tenant:{t_id}", name=t_data["name"]
+                )
+                topology.institutions.append(inst)
+                tenant_map[t_id] = inst
 
         return primary, tenant_map, device_owner_map, device_site_map
 
@@ -260,12 +273,15 @@ class TopologyBuilder:
                     lat, lon, adr = self.geocoder.get_location_data(
                         rep, sites_map, self.config.common.anonymize_location
                     )
-                    print("address:" + adr)
+                    
                     owner_ids = [primary_inst.id]
                     if inst.id != primary_inst.id:
                         owner_ids.append(inst.id)
                     site_obj = rep.get("site") or {}
                     site_nm = site_obj.get("name") or site_obj.get("display", "")
+                    site_nm = self.anonymizer.anonymize_site_name(
+                        site_obj.get("id"), site_nm
+                    )
                     plat_obj = rep.get("platform") or {}
                     plat_nm = plat_obj.get("name") if isinstance(plat_obj, dict) else None
                     node = TopologyNode(
@@ -303,9 +319,14 @@ class TopologyBuilder:
                         rep_dev = rep_devices_site[s_id]
                         site_obj = rep_dev.get("site") or {}
                         site_nm = site_obj.get("name") or site_obj.get("display", "")
+                        site_nm = self.anonymizer.anonymize_site_name(
+                            s_id, site_nm or name
+                        )
+                        if self.config.common.anonymize_site_names:
+                            name = site_nm or name
                         plat_obj = rep_dev.get("platform") or {}
                         plat_nm = plat_obj.get("name") if isinstance(plat_obj, dict) else None
-                        print("address:" + adr)
+                        
                         node = TopologyNode(
                             id=urn, name=name, short_name=name,
                             latitude=lat, longitude=lon, address=adr,
@@ -329,11 +350,17 @@ class TopologyBuilder:
                     owner_ids.append(tenant_map[t_id].id)
                 site_obj = device.get("site") or {}
                 site_nm = site_obj.get("name") or site_obj.get("display", "")
+                site_nm = self.anonymizer.anonymize_site_name(
+                    site_obj.get("id"), site_nm
+                )
                 plat_obj = device.get("platform") or {}
                 plat_nm = plat_obj.get("name") if isinstance(plat_obj, dict) else None
-                print("address:" + adr)
+                device_name = self.anonymizer.anonymize_device_name(
+                    device.get("id"), device["name"]
+                ) or device["name"]
+
                 node = TopologyNode(
-                    id=urn, name=device["name"], short_name=device["name"],
+                    id=urn, name=device_name, short_name=device_name,
                     latitude=lat, longitude=lon, address=adr,
                     owner_ids=owner_ids,
                     site_name=site_nm or None,

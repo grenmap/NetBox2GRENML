@@ -146,6 +146,14 @@ AGGREGATE_BY_SITE=false
 # Default: false
 REMOVE_UNLINKED_NODES=false
 
+# Consolidate all source NetBox tenants used by devices/sites into one tenant.
+# Default: false
+UNIFY_NETBOX_TENANTS=false
+
+# Name assigned to the consolidated tenant.
+# Only takes effect when UNIFY_NETBOX_TENANTS=true.
+UNIFIED_TENANT_NAME=Unified NetBox Tenant
+
 
 # ============================================================
 # 6. ANONYMIZATION
@@ -154,6 +162,24 @@ REMOVE_UNLINKED_NODES=false
 # Replaces with generic values.
 # Default: false
 ANONYMIZE_LOCATION=false
+
+# Replace site names with stable aliases (site-1, site-2, ...).
+# Default: false
+ANONYMIZE_SITE_NAMES=false
+
+# Prefix used for anonymized site names.
+# Only takes effect when ANONYMIZE_SITE_NAMES=true.
+# Default: site-
+ANONYMIZE_SITE_PREFIX=site-
+
+# Replace individual device names with stable aliases (device-1, device-2, ...).
+# Default: false
+ANONYMIZE_DEVICE_NAMES=false
+
+# Prefix used for anonymized device names.
+# Only takes effect when ANONYMIZE_DEVICE_NAMES=true.
+# Default: device-
+ANONYMIZE_DEVICE_PREFIX=device-
 
 # Anonymize extra device fields (manufacturer, model, serial,
 # etc.). Fields listed in ANONYMIZATION_EXCEPTIONS are preserved.

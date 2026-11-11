@@ -15,6 +15,12 @@ class Anonymizer:
         # Interface alias state
         self._if_alias_map: Dict[int, str] = {}
         self._if_alias_counter: int = 1
+        # Site alias state
+        self._site_alias_map: Dict[str, str] = {}
+        self._site_alias_counter: int = 1
+        # Device alias state
+        self._device_alias_map: Dict[str, str] = {}
+        self._device_alias_counter: int = 1
         # IP anonymization state — parse base from config
         base_parts = config.common.anonymize_ip_base.split(".")
         self._ip_base_o1: int = int(base_parts[0]) if len(base_parts) > 0 else 192
@@ -44,6 +50,10 @@ class Anonymizer:
         for key, value in device_data.items():
             if key in self.config.common.handled_keys or value in [None, {}, []]:
                 continue
+            if self.config.common.anonymize_device_names and key == "name":
+                value = self.anonymize_device_name(
+                    device_data.get("id"), str(value)
+                )
             if anonymized_ip and key in ("primary_ip", "primary_ip4"):
                 value = {"family": 4, "address": anonymized_ip}
             if (
@@ -57,6 +67,42 @@ class Anonymizer:
                 else str(value)
             )
             node.properties[key] = serialized
+
+    # ------------------------------------------------------------------
+    # Device / site name anonymization
+    # ------------------------------------------------------------------
+
+    def anonymize_device_name(
+        self, device_id: Optional[int], device_name: Optional[str]
+    ) -> Optional[str]:
+        """Return a stable alias for a device when name anonymization is enabled."""
+        if not self.config.common.anonymize_device_names or not device_name:
+            return device_name
+
+        key = f"id:{device_id}" if device_id is not None else f"name:{device_name}"
+        if key not in self._device_alias_map:
+            self._device_alias_map[key] = (
+                f"{self.config.common.anonymize_device_prefix}"
+                f"{self._device_alias_counter}"
+            )
+            self._device_alias_counter += 1
+        return self._device_alias_map[key]
+
+    def anonymize_site_name(
+        self, site_id: Optional[int], site_name: Optional[str]
+    ) -> Optional[str]:
+        """Return a stable alias for a site when name anonymization is enabled."""
+        if not self.config.common.anonymize_site_names or not site_name:
+            return site_name
+
+        key = f"id:{site_id}" if site_id is not None else f"name:{site_name}"
+        if key not in self._site_alias_map:
+            self._site_alias_map[key] = (
+                f"{self.config.common.anonymize_site_prefix}"
+                f"{self._site_alias_counter}"
+            )
+            self._site_alias_counter += 1
+        return self._site_alias_map[key]
 
     # ------------------------------------------------------------------
     # Interface / termination anonymization

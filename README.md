@@ -8,6 +8,8 @@ This tool provides a bridge between **NetBox API** and the **GRENML** (Global Re
 - **Circuit Resolution**: Automatically resolves complex connections where physical cables pass through logical circuit terminations.
 - **Robust Anonymization**: 
   - **Location**: Uses Reverse Geocoding to shift exact coordinates to a city/region level.
+  - **Site names**: Replaces site names with stable aliases (e.g., `site-1`) when enabled.
+  - **Device names**: Replaces individual device names with stable aliases (e.g., `device-1`) when enabled.
   - **IP Addresses**: Masks real primary IPs with private 192.168.x.x ranges while preserving masks.
   - **Interfaces**: Replaces interface names (e.g., `xe-0/0/0`) with generic aliases (e.g., `if-1`).
   - **Fields**: Cleans additional device properties based on exception lists.
@@ -42,7 +44,13 @@ The script is controlled by **Global Configuration Flags** located at the top of
 | `AGGREGATE_BY_OWNER` | Groups all active devices of the same tenant into a single node. |
 | `AGGREGATE_BY_SITE` | Groups all active devices of the same site into a single node (if Owner aggregation is off). |
 | `REMOVE_UNLINKED_NODES` | Removes nodes from the final XML if they have no links. |
+| `UNIFY_NETBOX_TENANTS` | Assigns all devices/sites with a source NetBox tenant to one tenant. |
+| `UNIFIED_TENANT_NAME` | Sets the name of the unified tenant (default: `Unified NetBox Tenant`). |
 | `ANONYMIZE_LOCATION` | Replaces exact coordinates with city-level geodata. |
+| `ANONYMIZE_SITE_NAMES` | Replaces site names with stable aliases (default prefix: `site-`). |
+| `ANONYMIZE_SITE_PREFIX` | Sets the prefix for anonymized site names. |
+| `ANONYMIZE_DEVICE_NAMES` | Replaces individual device names with stable aliases (default prefix: `device-`). |
+| `ANONYMIZE_DEVICE_PREFIX` | Sets the prefix for anonymized device names. |
 | `ANONYMIZE_INTERFACES` | Masks interface names with generic prefixes (e.g., `if-`). |
 | `ANONYMIZE_IPS` | Masks real IP addresses with internal private ranges. |
 | `ANONYMIZE_FIELDS` | Removes extra metadata from the nodes for privacy. |

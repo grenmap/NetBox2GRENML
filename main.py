@@ -1,7 +1,7 @@
 ﻿"""NetBox -> Topology -> Export pipeline.
 
 Usage:
-    python main.py --token SRC_TOKEN                          # GRENML only (default)
+    python main.py --token SRC_TOKEN                          # Uses EXPORT_FORMAT (grenml if unset)
     python main.py --token SRC_TOKEN --format netbox \\
                    --target-url https://dest.netbox.example/api/ \\
                    --target-token DST_TOKEN                   # NetBox only
@@ -35,8 +35,8 @@ def main() -> None:
     parser.add_argument(
         "--format", "-f",
         choices=["grenml", "netbox", "both"],
-        default="both",
-        help="Output format (default: grenml)",
+        default=None,
+        help="Output format (overrides EXPORT_FORMAT; defaults to EXPORT_FORMAT, then grenml)",
     )
     parser.add_argument(
         "--output", "-o",
@@ -90,13 +90,18 @@ def main() -> None:
         export_netbox=export_netbox,
         common=common,
     )
+    selected_format = args.format or config.export_format
+    if selected_format not in ("grenml", "netbox", "both"):
+        parser.error(
+            "EXPORT_FORMAT must be one of: grenml, netbox, both"
+        )
 
     # Validate target credentials when needed
-    if args.format in ("netbox", "both"):
+    if selected_format in ("netbox", "both"):
         if not config.export_netbox.target_url or not config.export_netbox.target_token:
             print(
                 "ERROR: --target-url and --target-token are required "
-                "when --format is 'netbox' or 'both'."
+                "when the output format is 'netbox' or 'both'."
             )
             sys.exit(1)
 
@@ -114,7 +119,9 @@ def main() -> None:
 
     # --- Export ---
     formats_to_run = (
-        ["grenml", "netbox"] if args.format == "both" else [args.format]
+        ["grenml", "netbox"]
+        if selected_format == "both"
+        else [selected_format]
     )
 
     for fmt in formats_to_run:
