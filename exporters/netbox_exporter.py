@@ -471,6 +471,15 @@ class NetBoxExporter(BaseExporter):
         """Get or create a platform by name. Returns the NetBox platform ID."""
         if platform_name in self._platform_map:
             return self._platform_map[platform_name]
+        platform_name = platform_name.strip()
+        if not platform_name:
+            return None
+        if len(platform_name) > 100:
+            print(
+                "  [WARN] Platform name exceeds NetBox's 100-character limit; "
+                f"skipping platform (length={len(platform_name)})."
+            )
+            return None
         slug = _slugify(platform_name)
         plat_id = self._get_or_create(
             "dcim/platforms", slug,

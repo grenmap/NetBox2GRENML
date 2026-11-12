@@ -1,6 +1,6 @@
-# NetBox to GRENML Converter
+# Network Topology Converter
 
-This tool provides a bridge between **NetBox API** and the **GRENML** (Global Research and Education Network Markup Language) format. It extracts network topology data—including devices, physical cables, sites, and logical circuits—and converts them into a standardized GRENML XML file.
+This tool imports network topology from either the **NetBox API** or a **GRENML** (Global Research and Education Network Markup Language) XML file. It converts the source into a shared topology model, optionally anonymizes it, then exports to GRENML, a target NetBox instance, or both.
 
 ## Key Features
 
@@ -14,7 +14,7 @@ This tool provides a bridge between **NetBox API** and the **GRENML** (Global Re
   - **Interfaces**: Replaces interface names (e.g., `xe-0/0/0`) with generic aliases (e.g., `if-1`).
   - **Fields**: Cleans additional device properties based on exception lists.
 - **Orphan Node Removal**: Option to automatically hide nodes that do not have any valid connections.
-- **Data Filtering**: Specifically designed to target active infrastructure nodes. This configuration can be changed and should be adapted to every NetBox repository (`role=CHANGE-ME`).
+- **NetBox Data Filtering**: Selects relevant active infrastructure nodes. Filters can be configured for each NetBox repository.
 
 ## Prerequisites
 
@@ -37,7 +37,13 @@ This tool provides a bridge between **NetBox API** and the **GRENML** (Global Re
 
 ## Configuration
 
-The script is controlled by **Global Configuration Flags** located at the top of the file.
+The script is controlled by command-line options and environment variables.
+
+| Setting | Description |
+| :--- | :--- |
+| `INPUT_FORMAT` | Input source: `netbox` (default) or `grenml`. |
+| `GRENML_INPUT_FILE` | GRENML XML file to import when `INPUT_FORMAT=grenml`. |
+| `EXPORT_FORMAT` | Output format: `grenml`, `netbox`, or `both`. |
 
 | Flag | Description |
 | :--- | :--- |
@@ -55,33 +61,35 @@ The script is controlled by **Global Configuration Flags** located at the top of
 | `ANONYMIZE_IPS` | Masks real IP addresses with internal private ranges. |
 | `ANONYMIZE_FIELDS` | Removes extra metadata from the nodes for privacy. |
 
-### API Credentials
+### Input and API Credentials
 
-In the `getCredentials()` function, insert your NetBox API token:
+For NetBox input, configure `NETBOX_SOURCE_URL` and `NETBOX_SOURCE_TOKEN`, or pass `--url` and `--token`.
+For GRENML input, set `INPUT_FORMAT=grenml` and `GRENML_INPUT_FILE=path/to/input.xml`, or pass `--input-format grenml --input path/to/input.xml`.
+NetBox output still requires `NETBOX_TARGET_URL` and `NETBOX_TARGET_TOKEN`, or `--target-url` and `--target-token`.
+
+Example: import a GRENML file and export it to both formats:
+
+```bash
+python main.py --input-format grenml --input topology.xml --format both \
+  --target-url https://dest.netbox.example/api/ --target-token DST_TOKEN
 ```
-credentials = 'YOUR_NETBOX_API_TOKEN_HERE'
-```
+
 ### How It Works
 
-The script operates in a two-pass pipeline:
+The script operates as a pipeline:
 
-    Pass 1 (Draft Phase):
+    Import:
 
-        Fetches all data (including inactive elements to ensure link mapping is complete).
+        Reads a NetBox API or parses and validates a GRENML XML file.
 
-        Resolves physical cables and logical circuits to determine which devices are connected.
+    Process:
 
-        Creates a "virtual draft" of the topology nodes based on your aggregation settings.
+      Builds a shared topology of institutions, nodes, and links. NetBox-specific filtering and
+      aggregation are applied on the NetBox input path; configured anonymization also applies to GRENML input.
 
-    Pass 2 (Commit Phase):
+    Export:
 
-        Filters the nodes based on the REMOVE_UNLINKED_NODES flag.
-
-        Commits the valid nodes and institutions to the GRENML manager.
-
-        Deduplicates and adds the links between the final nodes.
-
-        Generates the grenml.xml file.
+        Writes GRENML XML, exports to a target NetBox, or does both.
 
 ### Output
 

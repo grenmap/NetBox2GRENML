@@ -136,7 +136,11 @@ def _env_filters() -> List[FilterGroup]:
 
 @dataclass
 class ImportConfig:
-    """NetBox SOURCE connection settings."""
+    """Input source settings for NetBox or GRENML."""
+    input_format: str = field(default_factory=lambda: _env(
+        "INPUT_FORMAT", "netbox"))
+    grenml_file: str = field(default_factory=lambda: _env(
+        "GRENML_INPUT_FILE", ""))
     base_url: str = field(default_factory=lambda: _env(
         "NETBOX_SOURCE_URL", "your-netbox.example.com"))
     token: str = field(default_factory=lambda: _env(

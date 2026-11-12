@@ -16,8 +16,16 @@
 
 
 # ============================================================
-# 1. EXECUTION MODE
+# 1. INPUT SOURCE AND EXECUTION MODE
 # ============================================================
+# Input source.
+#   netbox — fetch from the configured NetBox API (default)
+#   grenml — parse a GRENML XML file
+INPUT_FORMAT=netbox
+
+# GRENML input file; used only when INPUT_FORMAT=grenml.
+GRENML_INPUT_FILE=
+
 # Pipeline output format.
 #   grenml  — generate GRENML file (.xml) only
 #   netbox  — export to target NetBox only

@@ -1,7 +1,8 @@
-﻿"""NetBox -> Topology -> Export pipeline.
+﻿"""Input -> Topology -> Export pipeline.
 
 Usage:
     python main.py --token SRC_TOKEN                          # Uses EXPORT_FORMAT (grenml if unset)
+    python main.py --input-format grenml --input network.xml  # GRENML input
     python main.py --token SRC_TOKEN --format netbox \\
                    --target-url https://dest.netbox.example/api/ \\
                    --target-token DST_TOKEN                   # NetBox only
@@ -17,6 +18,7 @@ import argparse
 import sys
 
 from config import Config, ImportConfig, ExportNetboxConfig, CommonConfig
+from importers.grenml import GRENMLImporter
 from importers.netbox import NetBoxImporter
 from processing.topology import TopologyBuilder
 from exporters.grenml_exporter import GRENMLExporter
@@ -43,6 +45,18 @@ def main() -> None:
         default="grenml.xml",
         help="Output file path for GRENML (default: grenml.xml)",
     )
+    parser.add_argument(
+        "--input-format",
+        choices=["netbox", "grenml"],
+        default=None,
+        help="Input source (overrides INPUT_FORMAT; defaults to netbox)",
+    )
+    parser.add_argument(
+        "--input", "--input-file",
+        dest="input_file",
+        default=None,
+        help="GRENML XML input file (required when input format is grenml)",
+    )
     # Source NetBox
     parser.add_argument("--token", "-t", default=None, help="Source NetBox API token")
     parser.add_argument("--url", "-u", default=None, help="Source NetBox base URL")
@@ -68,6 +82,10 @@ def main() -> None:
 
     # --- Build nested Config ---
     source = ImportConfig()
+    if args.input_format:
+        source.input_format = args.input_format
+    if args.input_file:
+        source.grenml_file = args.input_file
     if args.token:
         source.token = args.token
     if args.url:
@@ -91,6 +109,9 @@ def main() -> None:
         common=common,
     )
     selected_format = args.format or config.export_format
+    selected_input = config.source.input_format
+    if selected_input not in ("netbox", "grenml"):
+        parser.error("INPUT_FORMAT must be one of: netbox, grenml")
     if selected_format not in ("grenml", "netbox", "both"):
         parser.error(
             "EXPORT_FORMAT must be one of: grenml, netbox, both"
@@ -105,13 +126,16 @@ def main() -> None:
             )
             sys.exit(1)
 
-    # --- Import ---
-    importer = NetBoxImporter(config)
-    raw_data = importer.fetch_all()
-
-    # --- Process ---
-    builder = TopologyBuilder(config)
-    topology = builder.build(raw_data)
+    # --- Import and process ---
+    if selected_input == "grenml":
+        if not config.source.grenml_file:
+            parser.error("--input is required when the input format is 'grenml'")
+        topology = GRENMLImporter(config).import_file(config.source.grenml_file)
+    else:
+        importer = NetBoxImporter(config)
+        raw_data = importer.fetch_all()
+        builder = TopologyBuilder(config)
+        topology = builder.build(raw_data)
 
     print(f"\nTopology built: {len(topology.nodes)} nodes, "
           f"{len(topology.links)} links, "

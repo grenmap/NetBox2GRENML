@@ -3,3 +3,4 @@ venv
 *.xml
 *.env
 .env
+.venv/

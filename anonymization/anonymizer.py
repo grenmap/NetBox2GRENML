@@ -146,8 +146,11 @@ class Anonymizer:
         mask = None
         for key in ("primary_ip4", "primary_ip"):
             data = device_data.get(key)
-            if data and data.get("address"):
-                parts = str(data["address"]).split("/")
+            if isinstance(data, list):
+                data = next((item for item in data if item), None)
+            address = data.get("address") if isinstance(data, dict) else data
+            if address:
+                parts = str(address).split("/")
                 if len(parts) > 1:
                     mask = parts[1]
                     break
